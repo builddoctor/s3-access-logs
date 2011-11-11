@@ -14,7 +14,8 @@ preflight_check() {
 }
 
 clean() {
-  rm -r $BUILD_DIR
+  rm -f ${BUILD_DIR}/*.log
+  rm -rf ${BUILD_DIR}/webalyzer
 }
 
 fetch_logs() {
@@ -38,9 +39,10 @@ process_cloudfront() {
   bucket=$2
 
   find ${BUILD_DIR}/${bucket}/logs/cloudfront.${host} -name \*.gz -exec gzip -cd  {} >> ${BUILD_DIR}/cloudfront.${host}.log \;
-  awk -f cloudfront.awk ${BUILD_DIR}/cloudfront.${host}.log  > ${BUILD_DIR}/cloudfront.${host}.webalyzed.log
+# we could avoid the dependency on ruby. I've been spoiled
+  ruby date.rb < ${BUILD_DIR}/cloudfront.${host}.log | grep -v '^#' | awk -f cloudfront.awk > ${BUILD_DIR}/cloudfront.${host}.webalyzed.log
   mkdir -p ${BUILD_DIR}/webalyzer/cloudfront.${host}
-  webalizer -o ${BUILD_DIR}/cloudfront.${host} ${BUILD_DIR}/cloudfront.${host}.webalyzed.log  
+  webalizer -o ${BUILD_DIR}/webalyzer/cloudfront.${host} ${BUILD_DIR}/cloudfront.${host}.webalyzed.log  
 }
 [ -f "aws_secrets.sh" ] && source aws_secrets.sh
 
@@ -49,7 +51,6 @@ bucket=$1; shift
 s3host=$1; shift
 
 preflight_check
-#clean
 fetch_logs $bucket
 process_s3 $s3host $bucket
 process_cloudfront $s3host $bucket
